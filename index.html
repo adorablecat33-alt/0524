@@ -22,8 +22,6 @@ window.addEventListener('error', function(e){
   var el = document.getElementById('__err');
   if(el) el.textContent += '\n[錯誤] ' + e.message + '  @' + (e.lineno||'?') + ':' + (e.colno||'?');
 });
-</script>
-<script>
 function __boot(){
   if (typeof React === 'undefined' || typeof ReactDOM === 'undefined') {
     var el = document.getElementById('__err');
@@ -257,6 +255,12 @@ function M_calcMargin(invested, margin, accruedInterest) {
 const M_dailyInterest = (invested) => Math.round(invested * M_DAILY_INTEREST_RATE);
 const M_marginColor = (health) => health >= 1.2 ? "text-emerald-400" : health >= 1 ? "text-amber-400" : "text-red-400";
 const M_marginBar = (health) => health >= 1.2 ? "bg-emerald-500" : health >= 1 ? "bg-amber-500" : "bg-red-500";
+function M_calcProfit(realizedPnl, highWater, splitPct) {
+  const distributable = Math.max(0, realizedPnl - highWater);
+  const traderShare = Math.round(distributable * splitPct / 100);
+  const platformShare = distributable - traderShare;
+  return { distributable, traderShare, platformShare, canSettle: distributable > 0 };
+}
 const M_pnlText = (n) => (n > 0 ? "+" : "") + M_fmt(n);
 const M_MEMBERS = [
   {
@@ -274,6 +278,12 @@ const M_MEMBERS = [
       available: 118e4,
       margin: 62e4,
       todayPnl: 142e3,
+      principal: 2e6,
+      realizedPnl: 88e4,
+      unrealizedPnl: -15e3,
+      highWater: 5e5,
+      splitPct: 65,
+      settledTotal: 325e3,
       perms: ["\u73FE\u80A1", "\u671F\u8CA8", "\u878D\u8CC7\u878D\u5238", "\u7576\u6C96", "\u9583\u96FB\u4E0B\u55AE"],
       risk: { maxDailyLoss: 5e4, maxOrderAmount: 5e5, maxOrderQty: 10, maxDailyVolume: 5e6, markets: ["TWSE", "TPEX", "TAIFEX"] }
     },
@@ -324,6 +334,12 @@ const M_MEMBERS = [
       available: 14e5,
       margin: 7e5,
       todayPnl: 64e3,
+      principal: 1e6,
+      realizedPnl: 45e4,
+      unrealizedPnl: 62e3,
+      highWater: 3e5,
+      splitPct: 70,
+      settledTotal: 21e4,
       perms: ["\u73FE\u80A1", "\u671F\u8CA8", "\u7576\u6C96", "\u9583\u96FB\u4E0B\u55AE"],
       risk: { maxDailyLoss: 8e4, maxOrderAmount: 8e5, maxOrderQty: 15, maxDailyVolume: 8e6, markets: ["TWSE", "TPEX", "TAIFEX"] }
     },
@@ -355,6 +371,12 @@ const M_MEMBERS = [
       available: 15e5,
       margin: 0,
       todayPnl: 0,
+      principal: 15e5,
+      realizedPnl: 0,
+      unrealizedPnl: 0,
+      highWater: 0,
+      splitPct: 70,
+      settledTotal: 0,
       perms: ["\u73FE\u80A1", "\u671F\u8CA8"],
       risk: { maxDailyLoss: 4e4, maxOrderAmount: 4e5, maxOrderQty: 8, maxDailyVolume: 4e6, markets: ["TWSE", "TPEX"] }
     },
@@ -442,7 +464,7 @@ function M_List({ members, onSelect }) {
     },
     /* @__PURE__ */ React.createElement("div", { className: "flex items-start justify-between" }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2.5" }, /* @__PURE__ */ React.createElement("div", { className: "flex h-10 w-10 items-center justify-center rounded-full bg-white/5 text-sm font-bold text-gray-300" }, m.name[0]), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement("span", { className: "text-sm font-semibold text-gray-100" }, m.name), m.identities.map((id) => /* @__PURE__ */ React.createElement("span", { key: id, className: `rounded px-1.5 py-0.5 text-[10px] font-medium ${id === "A" ? "bg-blue-500/15 text-blue-400" : "bg-violet-500/15 text-violet-400"}` }, id === "A" ? "A" : "B"))), /* @__PURE__ */ React.createElement("p", { className: "mt-0.5 text-[11px] text-gray-500" }, m.phone))), /* @__PURE__ */ React.createElement("span", { className: `rounded-md px-2 py-0.5 text-[11px] font-medium ${M_STATUS_MAP[m.status][1]}` }, M_STATUS_MAP[m.status][0])),
     /* @__PURE__ */ React.createElement("div", { className: "mt-3 flex items-center justify-between" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", { className: "text-[11px] text-gray-600" }, "\u7E3D\u984D\u5EA6"), /* @__PURE__ */ React.createElement("p", { className: "text-sm font-bold text-gray-200" }, M_fmt(m.allocated))), /* @__PURE__ */ React.createElement("div", { className: "text-right" }, /* @__PURE__ */ React.createElement("p", { className: "text-[11px] text-gray-600" }, "\u4ECA\u65E5\u640D\u76CA"), /* @__PURE__ */ React.createElement("p", { className: `text-sm font-bold ${M_pnlColor(m.todayPnl)}` }, M_pnlText(m.todayPnl)))),
-    m.topNote && /* @__PURE__ */ React.createElement("div", { className: "mt-3 flex items-center gap-1.5 rounded-lg bg-amber-500/5 px-2.5 py-1.5" }, /* @__PURE__ */ React.createElement(M_PinIcon, { className: "h-3.5 w-3.5 shrink-0 text-amber-400/70" }), /* @__PURE__ */ React.createElement("span", { className: "text-[11px] text-amber-400/90" }, m.topNote))
+    m.topNote && m.identities.includes("B") && /* @__PURE__ */ React.createElement("div", { className: "mt-3 flex items-center gap-1.5 rounded-lg bg-amber-500/5 px-2.5 py-1.5" }, /* @__PURE__ */ React.createElement(M_PinIcon, { className: "h-3.5 w-3.5 shrink-0 text-amber-400/70" }), /* @__PURE__ */ React.createElement("span", { className: "text-[11px] text-amber-400/90" }, m.topNote))
   )), filtered.length === 0 && /* @__PURE__ */ React.createElement("p", { className: "py-12 text-center text-sm text-gray-600" }, "\u6C92\u6709\u7B26\u5408\u689D\u4EF6\u7684\u6703\u54E1")));
 }
 function M_FilterChip({ label, active, onClick }) {
@@ -514,7 +536,14 @@ function M_RiskBlock({ risk, usedLoss = 0 }) {
   )), lossOver && /* @__PURE__ */ React.createElement("p", { className: "mt-1.5 text-[11px] text-red-400" }, "\u5DF2\u9054\u4E0A\u9650\uFF0C\u7981\u6B62\u958B\u5009")), /* @__PURE__ */ React.createElement(M_Row, { k: "\u55AE\u7B46\u6700\u5927\u91D1\u984D", v: M_fmt(risk.maxOrderAmount) }), /* @__PURE__ */ React.createElement(M_Row, { k: "\u55AE\u7B46\u6700\u5927\u6578\u91CF", v: `${risk.maxOrderQty} \u5F35/\u53E3` }), /* @__PURE__ */ React.createElement(M_Row, { k: "\u6BCF\u65E5\u4EA4\u6613\u91CF\u4E0A\u9650", v: M_fmt(risk.maxDailyVolume) }), /* @__PURE__ */ React.createElement("div", { className: "mt-2 flex items-center justify-between" }, /* @__PURE__ */ React.createElement("span", { className: "text-[13px] text-gray-500" }, "\u53EF\u4EA4\u6613\u5E02\u5834"), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap justify-end gap-1" }, risk.markets.map((mk) => /* @__PURE__ */ React.createElement("span", { key: mk, className: "rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-gray-400" }, mk)))));
 }
 function M_IdentityTab({ m }) {
-  return /* @__PURE__ */ React.createElement("div", { className: "space-y-3" }, m.traderA && /* @__PURE__ */ React.createElement("div", { className: "rounded-2xl bg-[#161B24] p-4" }, /* @__PURE__ */ React.createElement("div", { className: "mb-3 flex items-center gap-2" }, /* @__PURE__ */ React.createElement("span", { className: "rounded px-1.5 py-0.5 text-[11px] font-medium bg-blue-500/15 text-blue-400" }, "A \u4EA4\u6613\u54E1"), /* @__PURE__ */ React.createElement("span", { className: `ml-auto text-sm font-bold ${M_pnlColor(m.traderA.todayPnl)}` }, M_pnlText(m.traderA.todayPnl))), /* @__PURE__ */ React.createElement(M_Row, { k: "\u5206\u914D\u984D\u5EA6", v: M_fmt(m.traderA.allocated) }), /* @__PURE__ */ React.createElement(M_Row, { k: "\u53EF\u7528\u8CC7\u91D1", v: M_fmt(m.traderA.available) }), /* @__PURE__ */ React.createElement(M_Row, { k: "\u4FDD\u8B49\u91D1", v: M_fmt(m.traderA.margin) }), /* @__PURE__ */ React.createElement("div", { className: "mt-3 border-t border-white/5 pt-3" }, /* @__PURE__ */ React.createElement("p", { className: "mb-2 text-[11px] text-gray-500" }, "\u4EA4\u6613\u6B0A\u9650"), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-1.5" }, m.traderA.perms.map((p) => /* @__PURE__ */ React.createElement("span", { key: p, className: "rounded-md bg-white/5 px-2 py-1 text-[11px] text-gray-300" }, p)))), /* @__PURE__ */ React.createElement(M_RiskBlock, { risk: m.traderA.risk, usedLoss: m.traderA.todayPnl < 0 ? -m.traderA.todayPnl : 0 })), m.traderB && /* @__PURE__ */ React.createElement("div", { className: "rounded-2xl bg-[#161B24] p-4" }, /* @__PURE__ */ React.createElement("div", { className: "mb-3 flex items-center gap-2" }, /* @__PURE__ */ React.createElement("span", { className: "rounded px-1.5 py-0.5 text-[11px] font-medium bg-violet-500/15 text-violet-400" }, "B \u4E19\u7A2E"), /* @__PURE__ */ React.createElement("span", { className: `ml-auto text-sm font-bold ${M_pnlColor(m.traderB.todayPnl)}` }, M_pnlText(m.traderB.todayPnl))), /* @__PURE__ */ React.createElement(M_Row, { k: "\u5206\u914D\u984D\u5EA6", v: M_fmt(m.traderB.allocated) }), /* @__PURE__ */ React.createElement(M_Row, { k: "\u5DF2\u6295\u5165\u91D1\u984D", v: M_fmt(m.traderB.invested) }), /* @__PURE__ */ React.createElement(M_Row, { k: "\u76EE\u524D\u4FDD\u8B49\u91D1", v: M_fmt(m.traderB.margin) }), /* @__PURE__ */ React.createElement(M_Row, { k: "\u501F\u6B3E\u5229\u7387", v: `\u842C\u5206\u4E4B ${m.traderB.rateBp} / \u65E5` }), (() => {
+  return /* @__PURE__ */ React.createElement("div", { className: "space-y-3" }, m.traderA && /* @__PURE__ */ React.createElement("div", { className: "rounded-2xl bg-[#161B24] p-4" }, /* @__PURE__ */ React.createElement("div", { className: "mb-3 flex items-center gap-2" }, /* @__PURE__ */ React.createElement("span", { className: "rounded px-1.5 py-0.5 text-[11px] font-medium bg-blue-500/15 text-blue-400" }, "A \u4EA4\u6613\u54E1"), /* @__PURE__ */ React.createElement("span", { className: `ml-auto text-sm font-bold ${M_pnlColor(m.traderA.todayPnl)}` }, M_pnlText(m.traderA.todayPnl))), /* @__PURE__ */ React.createElement(M_Row, { k: "\u5206\u914D\u984D\u5EA6", v: M_fmt(m.traderA.allocated) }), /* @__PURE__ */ React.createElement(M_Row, { k: "\u53EF\u7528\u8CC7\u91D1", v: M_fmt(m.traderA.available) }), /* @__PURE__ */ React.createElement(M_Row, { k: "\u4FDD\u8B49\u91D1", v: M_fmt(m.traderA.margin) }), m.traderA.principal !== void 0 && (() => {
+    const r = M_calcProfit(m.traderA.realizedPnl, m.traderA.highWater, m.traderA.splitPct);
+    return /* @__PURE__ */ React.createElement("div", { className: "mt-3 border-t border-white/5 pt-3" }, /* @__PURE__ */ React.createElement("p", { className: "mb-2 text-[11px] text-gray-500" }, "\u7E3E\u6548\u8207\u5206\u6F64"), /* @__PURE__ */ React.createElement(M_Row, { k: "\u5206\u914D\u672C\u91D1", v: M_fmt(m.traderA.principal) }), /* @__PURE__ */ React.createElement(M_Row, { k: "\u7D2F\u8A08\u5DF2\u5BE6\u73FE\u640D\u76CA", v: M_fmt(m.traderA.realizedPnl), vClass: m.traderA.realizedPnl >= 0 ? "text-emerald-400" : "text-red-400" }), /* @__PURE__ */ React.createElement(M_Row, { k: "\u672A\u5BE6\u73FE\u6D6E\u76C8\uFF08\u4E0D\u7D0D\u5165\u7D50\u7B97\uFF09", v: M_fmt(m.traderA.unrealizedPnl), vClass: "text-gray-500" }), /* @__PURE__ */ React.createElement(M_Row, { k: "\u6B77\u53F2\u6700\u9AD8\u6C34\u4F4D", v: M_fmt(m.traderA.highWater) }), /* @__PURE__ */ React.createElement(M_Row, { k: "\u62C6\u5E33\u6BD4\u4F8B\uFF08\u5F15\u5C0E\u684C\u6A5F\u8ABF\u6574\uFF09", v: `\u4EA4\u6613\u54E1 ${m.traderA.splitPct}% / \u5E73\u53F0 ${100 - m.traderA.splitPct}%`, vClass: "text-blue-400" }), /* @__PURE__ */ React.createElement(M_Row, { k: "\u7D2F\u8A08\u5DF2\u7D50\u7B97\u734E\u91D1", v: M_fmt(m.traderA.settledTotal) }), /* @__PURE__ */ React.createElement("div", { className: `mt-2 rounded-lg px-3 py-2 ${r.canSettle ? "bg-emerald-500/10" : "bg-white/5"}` }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between" }, /* @__PURE__ */ React.createElement("span", { className: "text-[12px] text-gray-400" }, "\u672C\u671F\u53EF\u5206\u6F64"), /* @__PURE__ */ React.createElement("span", { className: `text-sm font-bold ${r.canSettle ? "text-emerald-400" : "text-gray-500"}` }, r.canSettle ? M_fmt(r.distributable) + "\uFF08\u734E\u91D1 " + M_fmt(r.traderShare) + "\uFF09" : "\u672A\u8D85\u904E\u6C34\u4F4D\uFF0C\u7121\u53EF\u5206\u6F64"))), /* @__PURE__ */ React.createElement("p", { className: "mt-1.5 text-[11px] text-gray-600" }, "\u5206\u6F64\u7D50\u7B97\u65BC\u300C\u5206\u6F64\u7D50\u7B97\u300D\u9801\u7531\u5E73\u53F0\u4E3B\u52D5\u57F7\u884C"));
+  })(), /* @__PURE__ */ React.createElement("div", { className: "mt-3 border-t border-white/5 pt-3" }, /* @__PURE__ */ React.createElement("p", { className: "mb-2 text-[11px] text-gray-500" }, "\u4EA4\u6613\u6B0A\u9650"), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-1.5" }, m.traderA.perms.map((p) => /* @__PURE__ */ React.createElement("span", { key: p, className: "rounded-md bg-white/5 px-2 py-1 text-[11px] text-gray-300" }, p)))), /* @__PURE__ */ React.createElement(M_RiskBlock, { risk: m.traderA.risk, usedLoss: m.traderA.todayPnl < 0 ? -m.traderA.todayPnl : 0 })), m.traderB && /* @__PURE__ */ React.createElement("div", { className: "rounded-2xl bg-[#161B24] p-4" }, /* @__PURE__ */ React.createElement("div", { className: "mb-3 flex items-center gap-2" }, /* @__PURE__ */ React.createElement("span", { className: "rounded px-1.5 py-0.5 text-[11px] font-medium bg-violet-500/15 text-violet-400" }, "B \u4E19\u7A2E"), /* @__PURE__ */ React.createElement("span", { className: `ml-auto text-sm font-bold ${M_pnlColor(m.traderB.todayPnl)}` }, M_pnlText(m.traderB.todayPnl))), (() => {
+    const mm = M_calcMargin(m.traderB.invested, m.traderB.margin, m.traderB.accruedInterest);
+    const cfg = mm.health >= 1.2 ? { dot: "bg-emerald-400", bg: "bg-emerald-500/10", tx: "text-emerald-400", label: "\u4FDD\u8B49\u91D1\u5145\u8DB3" } : mm.health >= 1 ? { dot: "bg-amber-400", bg: "bg-amber-500/10", tx: "text-amber-400", label: "\u63A5\u8FD1\u9580\u6ABB\uFF0C\u7559\u610F" } : { dot: "bg-red-400", bg: "bg-red-500/10", tx: "text-red-400", label: "\u5DF2\u8DCC\u7834\u9580\u6ABB\uFF0C\u9700\u88DC\u4FDD" };
+    return /* @__PURE__ */ React.createElement("div", { className: `mb-3 flex items-center gap-2 rounded-lg px-3 py-2 ${cfg.bg}` }, /* @__PURE__ */ React.createElement("span", { className: `h-2 w-2 rounded-full ${cfg.dot}` }), /* @__PURE__ */ React.createElement("span", { className: `text-[13px] font-medium ${cfg.tx}` }, cfg.label), /* @__PURE__ */ React.createElement("span", { className: "ml-auto text-[11px] text-gray-500" }, "\u7DAD\u6301\u7387 ", Math.round(mm.health * 100), "%"));
+  })(), /* @__PURE__ */ React.createElement(M_Row, { k: "\u5206\u914D\u984D\u5EA6", v: M_fmt(m.traderB.allocated) }), /* @__PURE__ */ React.createElement(M_Row, { k: "\u5DF2\u6295\u5165\u91D1\u984D", v: M_fmt(m.traderB.invested) }), /* @__PURE__ */ React.createElement(M_Row, { k: "\u76EE\u524D\u4FDD\u8B49\u91D1", v: M_fmt(m.traderB.margin) }), /* @__PURE__ */ React.createElement(M_Row, { k: "\u501F\u6B3E\u5229\u7387", v: `\u842C\u5206\u4E4B ${m.traderB.rateBp} / \u65E5` }), (() => {
     const mm = M_calcMargin(m.traderB.invested, m.traderB.margin, m.traderB.accruedInterest);
     return /* @__PURE__ */ React.createElement("div", { className: "mt-3 border-t border-white/5 pt-3" }, /* @__PURE__ */ React.createElement("div", { className: "mb-1.5 flex items-center justify-between text-sm" }, /* @__PURE__ */ React.createElement("span", { className: "text-gray-500" }, "\u4FDD\u8B49\u91D1\u6DE8\u503C"), /* @__PURE__ */ React.createElement("span", { className: `font-bold ${M_marginColor(mm.health)}` }, M_fmt(mm.netValue), /* @__PURE__ */ React.createElement("span", { className: "ml-1 text-[11px] font-normal" }, "/ \u9580\u6ABB ", M_fmt(mm.threshold)))), /* @__PURE__ */ React.createElement("div", { className: "h-1.5 w-full overflow-hidden rounded-full bg-white/5" }, /* @__PURE__ */ React.createElement(
       "div",
@@ -1937,6 +1966,203 @@ function S_InfoIcon(p) {
 function S_CheckIcon(p) {
   return /* @__PURE__ */ React.createElement("svg", { ...S_iconBase(p) }, /* @__PURE__ */ React.createElement("path", { d: "M5 13l4 4L19 7" }));
 }
+const PR_fmt = (n) => "$" + Math.round(n).toLocaleString("en-US");
+function PR_calcProfit(realizedPnl, highWater, splitPct) {
+  const distributable = Math.max(0, realizedPnl - highWater);
+  const traderShare = Math.round(distributable * splitPct / 100);
+  const platformShare = distributable - traderShare;
+  const canSettle = distributable > 0;
+  return { distributable, traderShare, platformShare, canSettle };
+}
+const PR_TRADERS_INIT = [
+  {
+    id: "T1",
+    name: "\u5F35\u5FD7\u8C6A",
+    memberNo: "M00005",
+    dual: true,
+    // A+B 雙身分
+    principal: 1e6,
+    realizedPnl: 45e4,
+    unrealizedPnl: 62e3,
+    highWater: 3e5,
+    splitPct: 70,
+    settledTotal: 21e4
+  },
+  {
+    id: "T2",
+    name: "\u738B\u5C0F\u660E",
+    memberNo: "M00007",
+    dual: false,
+    principal: 2e6,
+    realizedPnl: 88e4,
+    unrealizedPnl: -15e3,
+    highWater: 5e5,
+    splitPct: 65,
+    settledTotal: 325e3
+  },
+  {
+    id: "T3",
+    name: "\u9673\u7F8E\u73B2",
+    memberNo: "M00012",
+    dual: false,
+    principal: 5e5,
+    realizedPnl: 12e4,
+    unrealizedPnl: 8e3,
+    highWater: 12e4,
+    splitPct: 60,
+    settledTotal: 72e3
+  },
+  // 已實現=水位，不能分
+  {
+    id: "T4",
+    name: "\u6797\u4F73\u7A4E",
+    memberNo: "M00019",
+    dual: false,
+    principal: 15e5,
+    realizedPnl: 24e4,
+    unrealizedPnl: 33e3,
+    highWater: 0,
+    splitPct: 70,
+    settledTotal: 0
+  }
+];
+function PR_App() {
+  const [traders, setTraders] = useState(PR_TRADERS_INIT);
+  const [selected, setSelected] = useState([]);
+  const [detail, setDetail] = useState(null);
+  const [confirm, setConfirm] = useState(null);
+  const [toast, setToast] = useState(null);
+  const toggleSelect = (id) => {
+    setSelected((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+  };
+  const settleable = selected.filter((id) => {
+    const t = traders.find((x) => x.id === id);
+    return PR_calcProfit(t.realizedPnl, t.highWater, t.splitPct).canSettle;
+  });
+  const doSettle = (ids) => {
+    setTraders((prev) => prev.map((t) => {
+      if (!ids.includes(t.id)) return t;
+      const r = PR_calcProfit(t.realizedPnl, t.highWater, t.splitPct);
+      if (!r.canSettle) return t;
+      return { ...t, highWater: t.realizedPnl, settledTotal: t.settledTotal + r.traderShare };
+    }));
+    setSelected([]);
+    setToast(ids.length > 1 ? `\u5DF2\u7D50\u7B97 ${ids.length} \u4F4D\u4EA4\u6613\u54E1` : "\u5DF2\u5B8C\u6210\u7D50\u7B97");
+  };
+  React.useEffect(() => {
+    if (!toast) return;
+    const x = setTimeout(() => setToast(null), 2200);
+    return () => clearTimeout(x);
+  }, [toast]);
+  if (detail) {
+    const t = traders.find((x) => x.id === detail);
+    return /* @__PURE__ */ React.createElement(
+      PR_Detail,
+      {
+        t,
+        onBack: () => setDetail(null),
+        onSettle: () => setConfirm({ type: "single", ids: [t.id] })
+      }
+    );
+  }
+  return /* @__PURE__ */ React.createElement("div", { className: "phone-frame text-gray-100" }, /* @__PURE__ */ React.createElement("header", { className: "sticky top-0 z-20 border-b border-white/5 bg-[#0B0E14]/95 px-4 py-3 backdrop-blur" }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-3" }, /* @__PURE__ */ React.createElement("button", { className: "flex h-9 w-9 items-center justify-center rounded-full bg-white/5", "aria-label": "\u8FD4\u56DE" }, /* @__PURE__ */ React.createElement(PR_BackIcon, { className: "h-5 w-5 text-gray-300" })), /* @__PURE__ */ React.createElement("h1", { className: "text-lg font-bold text-white" }, "\u5206\u6F64\u7D50\u7B97"), /* @__PURE__ */ React.createElement("span", { className: "ml-auto text-[11px] text-gray-600" }, "A \u4EA4\u6613\u54E1\u7E3E\u6548\u734E\u91D1"))), /* @__PURE__ */ React.createElement("div", { className: "px-4 pb-32 pt-4 space-y-3" }, /* @__PURE__ */ React.createElement("div", { className: "rounded-xl bg-blue-500/5 px-4 py-2.5" }, /* @__PURE__ */ React.createElement("p", { className: "text-[12px] text-gray-400" }, "\u5E73\u53F0\u4E3B\u52D5\u7D50\u7B97 \xB7 \u53EF\u55AE\u9078\u6216\u591A\u9078 \xB7 \u4F9D\u9AD8\u6C34\u4F4D\u7DDA\u53EA\u5206\u8D85\u904E\u6B77\u53F2\u6700\u9AD8\u7684\u90E8\u5206")), traders.map((t) => /* @__PURE__ */ React.createElement(
+    PR_TraderCard,
+    {
+      key: t.id,
+      t,
+      selected: selected.includes(t.id),
+      onToggle: () => toggleSelect(t.id),
+      onOpen: () => setDetail(t.id)
+    }
+  ))), selected.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "fixed inset-x-0 bottom-0 z-20 mx-auto max-w-[420px] border-t border-white/5 bg-[#0B0E14]/95 px-4 py-3 backdrop-blur" }, /* @__PURE__ */ React.createElement("div", { className: "mb-2 flex items-center justify-between text-[12px]" }, /* @__PURE__ */ React.createElement("span", { className: "text-gray-400" }, "\u5DF2\u9078 ", selected.length, " \u4F4D\uFF0C\u53EF\u7D50\u7B97 ", settleable.length, " \u4F4D"), /* @__PURE__ */ React.createElement("button", { onClick: () => setSelected([]), className: "text-gray-500" }, "\u6E05\u9664")), /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      disabled: settleable.length === 0,
+      onClick: () => settleable.length > 0 && setConfirm({ type: "batch", ids: settleable }),
+      className: `h-12 w-full rounded-xl text-sm font-semibold active:scale-95 ${settleable.length > 0 ? "bg-blue-500 text-white" : "cursor-not-allowed bg-white/5 text-gray-600"}`
+    },
+    settleable.length > 0 ? `\u7D50\u7B97\u9078\u53D6\u7684 ${settleable.length} \u4F4D` : "\u9078\u53D6\u9805\u76EE\u7121\u53EF\u7D50\u7B97\u91D1\u984D"
+  )), confirm && /* @__PURE__ */ React.createElement(
+    PR_ConfirmSheet,
+    {
+      confirm,
+      traders,
+      onClose: () => setConfirm(null),
+      onConfirmSettle: doSettle,
+      onConfirmRatio: (id, pct) => {
+        setTraders((prev) => prev.map((t) => t.id === id ? { ...t, splitPct: pct } : t));
+        setToast("\u5DF2\u66F4\u65B0\u62C6\u5E33\u6BD4\u4F8B");
+      }
+    }
+  ), toast && /* @__PURE__ */ React.createElement("div", { className: "fixed inset-x-0 bottom-6 z-40 mx-auto flex max-w-[420px] justify-center px-4" }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2 rounded-full bg-emerald-500/90 px-4 py-2.5 text-sm font-medium text-white shadow-lg" }, /* @__PURE__ */ React.createElement(PR_CheckIcon, { className: "h-4 w-4" }), " ", toast)));
+}
+function PR_TraderCard({ t, selected, onToggle, onOpen }) {
+  const r = PR_calcProfit(t.realizedPnl, t.highWater, t.splitPct);
+  return /* @__PURE__ */ React.createElement("div", { className: `rounded-2xl bg-[#161B24] p-4 ${selected ? "ring-2 ring-blue-500/60" : ""}` }, /* @__PURE__ */ React.createElement("div", { className: "flex items-start gap-3" }, /* @__PURE__ */ React.createElement("button", { onClick: onToggle, className: "mt-0.5 shrink-0", "aria-label": "\u9078\u53D6" }, /* @__PURE__ */ React.createElement("span", { className: `flex h-5 w-5 items-center justify-center rounded-md border ${selected ? "border-blue-500 bg-blue-500" : "border-gray-600"}` }, selected && /* @__PURE__ */ React.createElement(PR_CheckIcon, { className: "h-3.5 w-3.5 text-white" }))), /* @__PURE__ */ React.createElement("button", { onClick: onOpen, className: "flex-1 text-left" }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement("span", { className: "text-sm font-semibold text-gray-100" }, t.name), /* @__PURE__ */ React.createElement("span", { className: "rounded px-1.5 py-0.5 text-[10px] font-medium bg-blue-500/15 text-blue-400" }, "A \u4EA4\u6613\u54E1"), t.dual && /* @__PURE__ */ React.createElement("span", { className: "rounded px-1.5 py-0.5 text-[10px] font-medium bg-violet-500/15 text-violet-400" }, "+B \u4E19\u7A2E")), /* @__PURE__ */ React.createElement("p", { className: "mt-0.5 text-[11px] text-gray-600" }, t.memberNo, " \xB7 \u5206\u914D\u672C\u91D1 ", PR_fmt(t.principal)), /* @__PURE__ */ React.createElement("div", { className: "mt-3 flex items-end justify-between" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", { className: "text-[11px] text-gray-600" }, "\u672C\u671F\u53EF\u5206\u6F64"), /* @__PURE__ */ React.createElement("p", { className: `text-2xl font-bold ${r.canSettle ? "text-emerald-400" : "text-gray-500"}` }, r.canSettle ? PR_fmt(r.distributable) : "\u2014")), /* @__PURE__ */ React.createElement("div", { className: "text-right" }, /* @__PURE__ */ React.createElement("p", { className: "text-[11px] text-gray-600" }, "\u5DF2\u5BE6\u73FE\u640D\u76CA"), /* @__PURE__ */ React.createElement("p", { className: `text-sm font-bold ${t.realizedPnl >= 0 ? "text-emerald-400" : "text-red-400"}` }, PR_fmt(t.realizedPnl)))), r.canSettle ? /* @__PURE__ */ React.createElement("div", { className: "mt-2 flex items-center justify-between rounded-lg bg-[#0F131A] px-3 py-2 text-[12px]" }, /* @__PURE__ */ React.createElement("span", { className: "text-gray-500" }, "\u734E\u91D1 ", PR_fmt(r.traderShare), "\uFF08", t.splitPct, "%\uFF09"), /* @__PURE__ */ React.createElement("span", { className: "text-gray-500" }, "\u5E73\u53F0 ", PR_fmt(r.platformShare))) : /* @__PURE__ */ React.createElement("p", { className: "mt-2 rounded-lg bg-white/5 px-3 py-1.5 text-[11px] text-gray-600" }, "\u5DF2\u5BE6\u73FE\u640D\u76CA\u672A\u8D85\u904E\u9AD8\u6C34\u4F4D ", PR_fmt(t.highWater), "\uFF0C\u672C\u671F\u7121\u53EF\u5206\u6F64"))));
+}
+function PR_Detail({ t, onBack, onSettle }) {
+  const r = PR_calcProfit(t.realizedPnl, t.highWater, t.splitPct);
+  return /* @__PURE__ */ React.createElement("div", { className: "phone-frame text-gray-100" }, /* @__PURE__ */ React.createElement("header", { className: "sticky top-0 z-20 border-b border-white/5 bg-[#0B0E14]/95 px-4 py-3 backdrop-blur" }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-3" }, /* @__PURE__ */ React.createElement("button", { onClick: onBack, className: "flex h-9 w-9 items-center justify-center rounded-full bg-white/5", "aria-label": "\u8FD4\u56DE" }, /* @__PURE__ */ React.createElement(PR_BackIcon, { className: "h-5 w-5 text-gray-300" })), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement("h1", { className: "text-lg font-bold text-white" }, t.name), /* @__PURE__ */ React.createElement("span", { className: "rounded px-1.5 py-0.5 text-[11px] font-medium bg-blue-500/15 text-blue-400" }, "A \u4EA4\u6613\u54E1"), t.dual && /* @__PURE__ */ React.createElement("span", { className: "rounded px-1.5 py-0.5 text-[11px] font-medium bg-violet-500/15 text-violet-400" }, "+B")))), /* @__PURE__ */ React.createElement("div", { className: "px-4 pb-32 pt-4 space-y-4" }, /* @__PURE__ */ React.createElement("div", { className: `rounded-2xl p-4 ${r.canSettle ? "border border-emerald-500/30 bg-emerald-500/10" : "bg-[#161B24]"}` }, /* @__PURE__ */ React.createElement("p", { className: "text-[11px] text-gray-600" }, "\u672C\u671F\u53EF\u5206\u6F64\uFF08\u5DF2\u5BE6\u73FE \u2212 \u9AD8\u6C34\u4F4D\uFF09"), /* @__PURE__ */ React.createElement("p", { className: `text-3xl font-bold ${r.canSettle ? "text-emerald-400" : "text-gray-500"}` }, r.canSettle ? PR_fmt(r.distributable) : "\u2014"), r.canSettle && /* @__PURE__ */ React.createElement("div", { className: "mt-3 grid grid-cols-2 gap-2" }, /* @__PURE__ */ React.createElement("div", { className: "rounded-xl bg-[#0F131A] p-3" }, /* @__PURE__ */ React.createElement("p", { className: "text-[11px] text-gray-600" }, "\u4EA4\u6613\u54E1\u734E\u91D1\uFF08", t.splitPct, "%\uFF09"), /* @__PURE__ */ React.createElement("p", { className: "text-lg font-bold text-emerald-400" }, PR_fmt(r.traderShare))), /* @__PURE__ */ React.createElement("div", { className: "rounded-xl bg-[#0F131A] p-3" }, /* @__PURE__ */ React.createElement("p", { className: "text-[11px] text-gray-600" }, "\u5E73\u53F0\u6536\u76CA\uFF08", 100 - t.splitPct, "%\uFF09"), /* @__PURE__ */ React.createElement("p", { className: "text-lg font-bold text-gray-300" }, PR_fmt(r.platformShare))))), /* @__PURE__ */ React.createElement("div", { className: "rounded-2xl bg-[#161B24] p-4" }, /* @__PURE__ */ React.createElement("p", { className: "mb-3 text-sm font-semibold text-gray-200" }, "A \u5B50\u5E33\u7E3E\u6548"), /* @__PURE__ */ React.createElement("div", { className: "space-y-1.5" }, /* @__PURE__ */ React.createElement(PR_Row, { k: "\u5206\u914D\u672C\u91D1", v: PR_fmt(t.principal) }), /* @__PURE__ */ React.createElement(PR_Row, { k: "\u7D2F\u8A08\u5DF2\u5BE6\u73FE\u640D\u76CA", v: PR_fmt(t.realizedPnl), vClass: t.realizedPnl >= 0 ? "text-emerald-400" : "text-red-400" }), /* @__PURE__ */ React.createElement(PR_Row, { k: "\u672A\u5BE6\u73FE\u6D6E\u76C8\uFF08\u4E0D\u7D0D\u5165\u7D50\u7B97\uFF09", v: PR_fmt(t.unrealizedPnl), vClass: "text-gray-500" }), /* @__PURE__ */ React.createElement(PR_Row, { k: "\u6B77\u53F2\u6700\u9AD8\u6C34\u4F4D", v: PR_fmt(t.highWater) }), /* @__PURE__ */ React.createElement(PR_Row, { k: "\u62C6\u5E33\u6BD4\u4F8B\uFF08\u65BC\u6703\u54E1\u8A2D\u5B9A\u8ABF\u6574\uFF09", v: `\u4EA4\u6613\u54E1 ${t.splitPct}% / \u5E73\u53F0 ${100 - t.splitPct}%`, vClass: "text-blue-400" }), /* @__PURE__ */ React.createElement(PR_Row, { k: "\u7D2F\u8A08\u5DF2\u7D50\u7B97\u734E\u91D1", v: PR_fmt(t.settledTotal) }))), t.dual && /* @__PURE__ */ React.createElement("div", { className: "rounded-xl bg-violet-500/5 px-4 py-3" }, /* @__PURE__ */ React.createElement("p", { className: "text-[12px] text-violet-300/80" }, "\u6B64\u6703\u54E1\u53E6\u5177 B \u4E19\u7A2E\u8EAB\u5206\uFF0CB \u5B50\u5E33\u7684\u4FDD\u8B49\u91D1\u8207\u5229\u606F\u7368\u7ACB\u8A08\u7B97\uFF08\u898B\u6703\u54E1\u7BA1\u7406\uFF09\uFF0C\u8207 A \u5B50\u5E33\u4E92\u4E0D\u6D41\u7528\u3002")), /* @__PURE__ */ React.createElement("p", { className: "px-1 text-[11px] text-gray-600" }, "\u672A\u5BE6\u73FE\u6D6E\u76C8\u50C5\u4F9B\u53C3\u8003\uFF0C\u7D50\u7B97\u53EA\u8A8D\u5DF2\u5BE6\u73FE\u640D\u76CA\uFF1B\u4EA4\u6613\u54E1\u9808\u5148\u4E86\u7D50\u90E8\u4F4D\u5BE6\u73FE\u640D\u76CA\u5F8C\u624D\u6703\u8A08\u5165\u3002")), /* @__PURE__ */ React.createElement("div", { className: "fixed inset-x-0 bottom-0 z-20 mx-auto max-w-[420px] border-t border-white/5 bg-[#0B0E14]/95 px-4 py-3 backdrop-blur" }, /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      onClick: onSettle,
+      disabled: !r.canSettle,
+      className: `h-12 w-full rounded-xl text-sm font-semibold active:scale-95 ${r.canSettle ? "bg-blue-500 text-white" : "cursor-not-allowed bg-white/5 text-gray-600"}`
+    },
+    r.canSettle ? `\u7D50\u7B97 ${PR_fmt(r.distributable)}` : "\u672C\u671F\u7121\u53EF\u5206\u6F64"
+  )));
+}
+function PR_ConfirmSheet({ confirm, traders, onClose, onConfirmSettle, onConfirmRatio }) {
+  const [done, setDone] = useState(false);
+  const isRatio = confirm.type === "ratio";
+  const ratioTrader = isRatio ? traders.find((t) => t.id === confirm.id) : null;
+  const [pct, setPct] = useState(ratioTrader ? ratioTrader.splitPct : 70);
+  const finishSettle = () => {
+    setDone(true);
+    setTimeout(() => {
+      onConfirmSettle(confirm.ids);
+      onClose();
+    }, 800);
+  };
+  const finishRatio = () => {
+    setDone(true);
+    setTimeout(() => {
+      onConfirmRatio(confirm.id, pct);
+      onClose();
+    }, 800);
+  };
+  const settleList = !isRatio ? confirm.ids.map((id) => {
+    const t = traders.find((x) => x.id === id);
+    const r = PR_calcProfit(t.realizedPnl, t.highWater, t.splitPct);
+    return { t, r };
+  }) : [];
+  const totalTrader = settleList.reduce((s, x) => s + x.r.traderShare, 0);
+  const totalPlatform = settleList.reduce((s, x) => s + x.r.platformShare, 0);
+  return /* @__PURE__ */ React.createElement("div", { className: "fixed inset-0 z-30 mx-auto flex max-w-[420px] flex-col justify-end bg-black/60", onClick: onClose }, /* @__PURE__ */ React.createElement("div", { className: "rounded-t-3xl bg-[#161B24] p-5 pb-8", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { className: "mx-auto mb-4 h-1 w-10 rounded-full bg-white/15" }), done ? /* @__PURE__ */ React.createElement("div", { className: "py-8 text-center" }, /* @__PURE__ */ React.createElement("div", { className: "mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/15" }, /* @__PURE__ */ React.createElement(PR_CheckIcon, { className: "h-7 w-7 text-emerald-400" })), /* @__PURE__ */ React.createElement("p", { className: "text-base font-semibold text-white" }, "\u5DF2\u5B8C\u6210"), /* @__PURE__ */ React.createElement("p", { className: "mt-1 text-sm text-gray-500" }, "\uFF08\u6A21\u64EC\uFF1A\u672A\u9023\u63A5\u771F\u5BE6\u91D1\u6D41\uFF09")) : isRatio ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("h3", { className: "text-lg font-bold text-white" }, "\u8A2D\u5B9A\u62C6\u5E33\u6BD4\u4F8B \u2014 ", ratioTrader.name), /* @__PURE__ */ React.createElement("p", { className: "mt-2 text-[12px] text-gray-500" }, "\u6B64\u6BD4\u4F8B\u50C5\u5F8C\u53F0\u53EF\u898B\uFF0C\u4E0D\u5C0D\u4EA4\u6613\u54E1\u63ED\u9732"), /* @__PURE__ */ React.createElement("div", { className: "mt-5 text-center" }, /* @__PURE__ */ React.createElement("p", { className: "text-4xl font-bold text-blue-400" }, pct, "%"), /* @__PURE__ */ React.createElement("p", { className: "mt-1 text-[12px] text-gray-500" }, "\u4EA4\u6613\u54E1 ", pct, "% / \u5E73\u53F0 ", 100 - pct, "%")), /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      type: "range",
+      min: "0",
+      max: "100",
+      step: "5",
+      value: pct,
+      onChange: (e) => setPct(Number(e.target.value)),
+      className: "mt-4 w-full accent-blue-500"
+    }
+  ), /* @__PURE__ */ React.createElement("div", { className: "mt-5 flex gap-3" }, /* @__PURE__ */ React.createElement("button", { onClick: onClose, className: "h-12 flex-1 rounded-xl bg-white/5 text-sm font-medium text-gray-300 active:scale-95" }, "\u53D6\u6D88"), /* @__PURE__ */ React.createElement("button", { onClick: finishRatio, className: "h-12 flex-1 rounded-xl bg-blue-500 text-sm font-semibold text-white active:scale-95" }, "\u5132\u5B58\u6BD4\u4F8B"))) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("h3", { className: "text-lg font-bold text-white" }, "\u78BA\u8A8D\u7D50\u7B97", confirm.ids.length > 1 ? `\uFF08${confirm.ids.length} \u4F4D\uFF09` : ""), /* @__PURE__ */ React.createElement("p", { className: "mt-2 text-[12px] text-gray-500" }, "\u7D50\u7B97\u5F8C\u4EA4\u6613\u54E1\u734E\u91D1\u8F49\u70BA\u53EF\u51FA\u91D1\uFF0C\u9AD8\u6C34\u4F4D\u7DDA\u63A8\u5347\u81F3\u76EE\u524D\u5DF2\u5BE6\u73FE\u640D\u76CA\uFF0C\u6B64\u64CD\u4F5C\u4E0D\u53EF\u5FA9\u539F\u3002"), /* @__PURE__ */ React.createElement("div", { className: "mt-4 max-h-52 space-y-2 overflow-y-auto" }, settleList.map(({ t, r }) => /* @__PURE__ */ React.createElement("div", { key: t.id, className: "rounded-xl bg-[#0F131A] p-3" }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between" }, /* @__PURE__ */ React.createElement("span", { className: "text-sm font-medium text-gray-200" }, t.name), /* @__PURE__ */ React.createElement("span", { className: "text-sm font-bold text-emerald-400" }, "\u734E\u91D1 ", PR_fmt(r.traderShare))), /* @__PURE__ */ React.createElement("p", { className: "mt-1 text-[11px] text-gray-600" }, "\u53EF\u5206 ", PR_fmt(r.distributable), " \xB7 \u5E73\u53F0 ", PR_fmt(r.platformShare), " \xB7 \u6BD4\u4F8B ", t.splitPct, "%")))), /* @__PURE__ */ React.createElement("div", { className: "mt-3 rounded-xl bg-blue-500/10 p-3" }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between text-sm" }, /* @__PURE__ */ React.createElement("span", { className: "text-gray-300" }, "\u5408\u8A08\u4EA4\u6613\u54E1\u734E\u91D1"), /* @__PURE__ */ React.createElement("span", { className: "font-bold text-emerald-400" }, PR_fmt(totalTrader))), /* @__PURE__ */ React.createElement("div", { className: "mt-1 flex items-center justify-between text-[12px]" }, /* @__PURE__ */ React.createElement("span", { className: "text-gray-500" }, "\u5408\u8A08\u5E73\u53F0\u6536\u76CA"), /* @__PURE__ */ React.createElement("span", { className: "text-gray-400" }, PR_fmt(totalPlatform)))), /* @__PURE__ */ React.createElement("div", { className: "mt-5 flex gap-3" }, /* @__PURE__ */ React.createElement("button", { onClick: onClose, className: "h-12 flex-1 rounded-xl bg-white/5 text-sm font-medium text-gray-300 active:scale-95" }, "\u53D6\u6D88"), /* @__PURE__ */ React.createElement("button", { onClick: finishSettle, className: "h-12 flex-1 rounded-xl bg-blue-500 text-sm font-semibold text-white active:scale-95" }, "\u78BA\u8A8D\u7D50\u7B97")))));
+}
+function PR_Row({ k, v, vClass = "text-gray-200" }) {
+  return /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between" }, /* @__PURE__ */ React.createElement("span", { className: "text-[13px] text-gray-500" }, k), /* @__PURE__ */ React.createElement("span", { className: `text-[13px] font-medium ${vClass}` }, v));
+}
+function PR_iconBase(p) {
+  return { fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round", viewBox: "0 0 24 24", ...p };
+}
+function PR_BackIcon(p) {
+  return /* @__PURE__ */ React.createElement("svg", { ...PR_iconBase(p) }, /* @__PURE__ */ React.createElement("path", { d: "M15 6l-6 6 6 6" }));
+}
+function PR_CheckIcon(p) {
+  return /* @__PURE__ */ React.createElement("svg", { ...PR_iconBase(p) }, /* @__PURE__ */ React.createElement("path", { d: "M5 13l4 4L19 7" }));
+}
 function RootApp() {
   const [page, setPage] = React.useState("dashboard");
   const [moreOpen, setMoreOpen] = React.useState(false);
@@ -1953,7 +2179,8 @@ function RootApp() {
     risk: R_App,
     margincall: C_App,
     notif: N_App,
-    settings: S_App
+    settings: S_App,
+    profit: PR_App
   };
   const Current = PAGES[page] || D_App;
   const mainNav = [
@@ -1965,6 +2192,7 @@ function RootApp() {
   const moreNav = [
     { key: "funds", label: "\u51FA\u5165\u91D1\u7BA1\u7406", icon: NavExchange },
     { key: "positions", label: "\u90E8\u4F4D\u7E3D\u89BD", icon: NavBriefcase },
+    { key: "profit", label: "\u5206\u6F64\u7D50\u7B97", icon: NavSplit },
     { key: "risk", label: "\u98A8\u63A7\u7BA1\u7406", icon: NavShield, badge: 2 },
     { key: "notif", label: "\u901A\u77E5\u7D00\u9304", icon: NavBell },
     { key: "settings", label: "\u7CFB\u7D71\u8A2D\u5B9A", icon: NavGear }
@@ -2027,6 +2255,9 @@ function NavBell(p) {
 }
 function NavGear(p) {
   return /* @__PURE__ */ React.createElement("svg", { ...navBase(p) }, /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "3" }), /* @__PURE__ */ React.createElement("path", { d: "M12 3v2M12 19v2M5 5l1.5 1.5M17.5 17.5L19 19M3 12h2M19 12h2M5 19l1.5-1.5M17.5 6.5L19 5" }));
+}
+function NavSplit(p) {
+  return /* @__PURE__ */ React.createElement("svg", { ...navBase(p) }, /* @__PURE__ */ React.createElement("path", { d: "M6 3v6a3 3 0 0 0 3 3h6a3 3 0 0 1 3 3v6" }), /* @__PURE__ */ React.createElement("path", { d: "M3 6l3-3 3 3" }), /* @__PURE__ */ React.createElement("path", { d: "M15 18l3 3 3-3" }));
 }
 ReactDOM.createRoot(document.getElementById("root")).render(/* @__PURE__ */ React.createElement(RootApp, null));
 
